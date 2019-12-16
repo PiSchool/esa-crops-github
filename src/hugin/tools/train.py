@@ -25,7 +25,7 @@ import os
 import yaml
 from numpy import random
 
-from ..tools.IOUtils import IOUtils
+from hugin.tools.IOUtils import IOUtils
 
 try:
     from yaml import CLoader as Loader, CDumper as Dumper
@@ -34,7 +34,7 @@ except ImportError:
 
 import numpy as np
 
-from ..io import DataGenerator, ThreadedDataGenerator, CategoricalConverter, DatasetLoader
+from hugin.io import DataGenerator, ThreadedDataGenerator, CategoricalConverter, DatasetLoader
 
 log = getLogger(__name__)
 
@@ -152,6 +152,10 @@ def train_keras(model_name,
     train_epochs = model_config["train_epochs"]
     prefetch_queue_size = model_config.get("prefetch_queue_size", 10)
     input_channels = len(mapping["inputs"])
+
+    z_scaler = model_config.get('z_scaler',None)
+
+
     train_data = DataGenerator(train_datasets,
                                batch_size,
                                mapping["inputs"],
@@ -160,7 +164,7 @@ def train_keras(model_name,
                                swap_axes=swap_axes,
                                postprocessing_callbacks=pre_callbacks,
                                default_window_size=window_size,
-                               default_stride_size=stride_size)
+                               default_stride_size=stride_size,z_scaler=z_scaler)
 
     train_data = ThreadedDataGenerator(train_data, queue_size=prefetch_queue_size)
 
@@ -171,7 +175,7 @@ def train_keras(model_name,
                                     format_converter=format_converter,
                                     swap_axes=swap_axes,
                                     default_window_size=window_size,
-                                    default_stride_size=stride_size)
+                                    default_stride_size=stride_size,z_scaler=z_scaler)
 
     validation_data = ThreadedDataGenerator(validation_data, queue_size=prefetch_queue_size)
 

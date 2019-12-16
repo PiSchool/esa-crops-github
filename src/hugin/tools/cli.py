@@ -38,7 +38,7 @@ def predict_handler(*args, **kw):
 
 
 def train_handler(*args, **kw):
-    from .train import train_handler as train_handler_impl
+    from hugin.tools.train import train_handler as train_handler_impl
     return train_handler_impl(*args, **kw)
 
 

@@ -131,6 +131,25 @@ def avg_scorer(y_true, y_pred):
     return avg_score
 
 
+def f1(y_true, y_pred):
+    def recall(y_true, y_pred):
+        """Recall metric."""
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+        recall = true_positives / (possible_positives + K.epsilon())
+        return recall
+
+    def precision(y_true, y_pred):
+        """Precision metric."""
+        true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+        predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+        precision = true_positives / (predicted_positives + K.epsilon())
+        return precision
+
+    precision = precision(y_true, y_pred)
+    recall = recall(y_true, y_pred)
+    return 2 * ((precision * recall) / (precision + recall))
+
 # Compute mean_iou per class https://www.davidtvs.com/keras-custom-metrics/
 def mean_iou(y_true, y_pred):
     # Wraps np_mean_iou method and uses it as a TensorFlow op.

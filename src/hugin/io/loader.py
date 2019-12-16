@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
+
 __license__ = \
     """Copyright 2019 West University of Timisoara
-    
+
        Licensed under the Apache License, Version 2.0 (the "License");
        you may not use this file except in compliance with the License.
        You may obtain a copy of the License at
-    
+
            http://www.apache.org/licenses/LICENSE-2.0
-    
+
        Unless required by applicable law or agreed to in writing, software
        distributed under the License is distributed on an "AS IS" BASIS,
        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -51,7 +52,8 @@ class CategoricalConverter(object):
         self._num_classes = num_classes
 
     def __call__(self, entry):
-        # entry = entry.reshape(entry.shape + (1, ))
+        # entry = entry.reshape((entry.shape[0],entry.shape[1]))
+
         cat = to_categorical(entry, self._num_classes)
         return cat
 
@@ -209,7 +211,7 @@ class DatasetLoader(object):
 
 
 class TileGenerator(object):
-    def __init__(self, scene, shape=None, mapping=(), stride=None, swap_axes=False, normalize=False):
+    def __init__(self, scene, shape=None, mapping=(), stride=None, swap_axes=False, normalize=False, z_scaler=False):
         """
         @shape: specify the shape of the window/tile. None means the window covers the whole image
         @stride: the stride used for moving the windows
@@ -222,6 +224,7 @@ class TileGenerator(object):
         self.swap_axes = swap_axes
         self._normalize = normalize
         self._count = 0
+        self._z_scaler = z_scaler
         if self._stride is None and self._shape is not None:
             self._stride = self._shape[0]
 
@@ -260,13 +263,16 @@ class TileGenerator(object):
         return int(num_horiz * num_vert)
 
     @backoff.on_exception(backoff.expo, OSError, max_time=120)
-    def read_window(self, dset, band, window):
-        data = dset.read(band, window=window)
+    def read_window(self, dset, band, window=None):
+        if window:
+            data = dset.read(band, window=window)
+        else:
+            data = dset.read(band)
 
         self._count += 1
         return data
 
-    def _generate_tiles_for_mapping(self, dataset, mapping, target_shape, target_stride):
+    def _generate_tiles_for_mapping(self, dataset, mapping, target_shape, target_stride, norm=False):
         if not mapping: return
 
         window_width, window_height = target_shape
@@ -315,8 +321,19 @@ class TileGenerator(object):
                     preprocessing_callbacks = map_entry.get("preprocessing", [])
 
                     band = self.read_window(backing_store, channel, window)
-                    if normalization_value is not None:
-                        band = band / normalization_value
+
+                    if self._z_scaler:
+                        # print(np.unique(band))
+                        # print(np.amax(band))
+                        if map_entry['type'] in self._z_scaler:
+                            band = (abs(band - self._z_scaler[map_entry['type']]['mean'])) / \
+                                   self._z_scaler[map_entry['type']]['std']
+                            # print(np.unique(band))
+                            # print(np.amax(band))
+                            # print("Max "+ str(np.amax(band)))
+                            # if normalization_value is not None:
+                            #   band = band / normalization_value
+                    # print("Normalized " + str(np.amax(band)))
                     if transform_expression is not None:
                         raise NotImplementedError("Snuggs expressions are currently not implemented")
                     for callback in preprocessing_callbacks:
@@ -345,6 +362,7 @@ class TileGenerator(object):
             base_channel = mapping['channels'][0][0]
             target_shape, target_stride = adapt_shape_and_stride(self._scene[base_channel], primary_base_scene,
                                                                  primary_shape, primary_stride)
+            target_shape, target_stride = primary_shape, primary_stride
             input_generators[mapping_name] = self._generate_tiles_for_mapping(self._scene, mapping, target_shape,
                                                                               target_stride)
 
@@ -352,6 +370,7 @@ class TileGenerator(object):
             base_channel = mapping['channels'][0][0]
             target_shape, target_stride = adapt_shape_and_stride(self._scene[base_channel], primary_base_scene,
                                                                  primary_shape, primary_stride)
+            target_shape, target_stride = primary_shape, primary_stride
             output_generators[mapping_name] = self._generate_tiles_for_mapping(self._scene, mapping, target_shape,
                                                                                target_stride)
 
@@ -426,7 +445,8 @@ class DataGenerator(object):
                  postprocessing_callbacks=[],
                  optimise_huge_datasets=True,
                  default_window_size=None,
-                 default_stride_size=None):
+                 default_stride_size=None,
+                 z_scaler=False):
 
         if default_window_size is not None:
             self.primary_window_shape = default_window_size
@@ -442,6 +462,8 @@ class DataGenerator(object):
             output_mapping = self._convert_output_mapping(output_mapping)
 
         self._datasets = datasets
+
+        self._z_scaler = z_scaler
 
         primary_mapping = [input_mapping[m] for m in input_mapping if input_mapping[m].get('primary', False)]
         if len(primary_mapping) > 1:
@@ -551,7 +573,7 @@ class DataGenerator(object):
                                            self.primary_window_shape,
                                            stride=self.primary_stride,
                                            mapping=self._mapping,
-                                           swap_axes=self._swap_axes)
+                                           swap_axes=self._swap_axes, z_scaler=self._z_scaler)
 
             for entry in tile_generator:
                 count += 1
@@ -630,4 +652,63 @@ class ThreadedDataGenerator(threading.Thread):
 
 
 if __name__ == "__main__":
-    pass
+    if __name__ == "__main__":
+        dataset_cache = "/home/tardis/hugin-teo/etc/samples/sample_olanda_05.yaml"
+        log.debug("dataset_cache is set from config to %s", dataset_cache)
+        model_name = "unet_forestry1_T34_T33"
+        import time
+        import socket
+        import getpass
+        import yaml
+
+        try:
+            from yaml import CLoader as Loader, CDumper as Dumper
+        except ImportError:
+            from yaml import Loader, Dumper
+        dataset_cache = dataset_cache.format(model_name=model_name,
+                                             time=str(time.time()),
+                                             hostname=socket.gethostname(),
+                                             user=getpass.getuser())
+
+        from hugin.io.dataset_loaders import FileSystemLoader
+
+        data_source = FileSystemLoader(
+            data_pattern='(?P<region>T[0-9A-Z]+)_(?P<timestamp>[A-Z0-9]+)_(?P<type>[A-Z0-9_a-z]+)_(?P<res>[0-9a-z]+)_(?P<crs>[0-9]+)..*$',
+            id_format='{region}-{timestamp}',
+            type_format='{type}-{res}-{crs}',
+            input_source='/home/tardis/hugin-teo/data/sentinel2_bands_only_olanda_2018/')
+        train_datasets, validation_datasets = yaml.load(IOUtils.open_file(dataset_cache), Loader=Loader)
+
+        # train_datasets = train_datasets._datasets
+
+        # validation_datasets = validation_datasets._datasets
+
+        train_datasets, validation_datasets = data_source.build_dataset_loaders(train_datasets, validation_datasets)
+
+        train_datasets.loop = True
+        validation_datasets.loop = True
+
+        batch_size = 10
+        mapping = {'inputs': [['B02-10m-4326', 1], ['B03-10m-4326', 1], ['B04-10m-4326', 1], ['B08-10m-4326', 1]],
+                   'target': [['GT-10m-4326', 1]]}
+        format_converter = CategoricalConverter(num_classes=8)
+        swap_axes = True
+        pre_callbacks = []
+        window_size = [256, 256]
+        stride_size = 128
+        train_data = DataGenerator(train_datasets,
+                                   batch_size,
+                                   mapping["inputs"],
+                                   mapping["target"],
+                                   format_converter=format_converter,
+                                   swap_axes=swap_axes,
+                                   postprocessing_callbacks=pre_callbacks,
+                                   default_window_size=window_size,
+                                   default_stride_size=stride_size,
+                                   z_scaler=True
+                                   )
+
+        for a in train_data:
+            b = a
+
+        b = 5
