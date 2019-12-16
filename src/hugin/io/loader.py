@@ -323,17 +323,11 @@ class TileGenerator(object):
                     band = self.read_window(backing_store, channel, window)
 
                     if self._z_scaler:
-                        # print(np.unique(band))
-                        # print(np.amax(band))
+
                         if map_entry['type'] in self._z_scaler:
                             band = (abs(band - self._z_scaler[map_entry['type']]['mean'])) / \
                                    self._z_scaler[map_entry['type']]['std']
-                            # print(np.unique(band))
-                            # print(np.amax(band))
-                            # print("Max "+ str(np.amax(band)))
-                            # if normalization_value is not None:
-                            #   band = band / normalization_value
-                    # print("Normalized " + str(np.amax(band)))
+
                     if transform_expression is not None:
                         raise NotImplementedError("Snuggs expressions are currently not implemented")
                     for callback in preprocessing_callbacks:
@@ -650,65 +644,3 @@ class ThreadedDataGenerator(threading.Thread):
                 break
             yield d
 
-
-if __name__ == "__main__":
-    if __name__ == "__main__":
-        dataset_cache = "/home/tardis/hugin-teo/etc/samples/sample_olanda_05.yaml"
-        log.debug("dataset_cache is set from config to %s", dataset_cache)
-        model_name = "unet_forestry1_T34_T33"
-        import time
-        import socket
-        import getpass
-        import yaml
-
-        try:
-            from yaml import CLoader as Loader, CDumper as Dumper
-        except ImportError:
-            from yaml import Loader, Dumper
-        dataset_cache = dataset_cache.format(model_name=model_name,
-                                             time=str(time.time()),
-                                             hostname=socket.gethostname(),
-                                             user=getpass.getuser())
-
-        from hugin.io.dataset_loaders import FileSystemLoader
-
-        data_source = FileSystemLoader(
-            data_pattern='(?P<region>T[0-9A-Z]+)_(?P<timestamp>[A-Z0-9]+)_(?P<type>[A-Z0-9_a-z]+)_(?P<res>[0-9a-z]+)_(?P<crs>[0-9]+)..*$',
-            id_format='{region}-{timestamp}',
-            type_format='{type}-{res}-{crs}',
-            input_source='/home/tardis/hugin-teo/data/sentinel2_bands_only_olanda_2018/')
-        train_datasets, validation_datasets = yaml.load(IOUtils.open_file(dataset_cache), Loader=Loader)
-
-        # train_datasets = train_datasets._datasets
-
-        # validation_datasets = validation_datasets._datasets
-
-        train_datasets, validation_datasets = data_source.build_dataset_loaders(train_datasets, validation_datasets)
-
-        train_datasets.loop = True
-        validation_datasets.loop = True
-
-        batch_size = 10
-        mapping = {'inputs': [['B02-10m-4326', 1], ['B03-10m-4326', 1], ['B04-10m-4326', 1], ['B08-10m-4326', 1]],
-                   'target': [['GT-10m-4326', 1]]}
-        format_converter = CategoricalConverter(num_classes=8)
-        swap_axes = True
-        pre_callbacks = []
-        window_size = [256, 256]
-        stride_size = 128
-        train_data = DataGenerator(train_datasets,
-                                   batch_size,
-                                   mapping["inputs"],
-                                   mapping["target"],
-                                   format_converter=format_converter,
-                                   swap_axes=swap_axes,
-                                   postprocessing_callbacks=pre_callbacks,
-                                   default_window_size=window_size,
-                                   default_stride_size=stride_size,
-                                   z_scaler=True
-                                   )
-
-        for a in train_data:
-            b = a
-
-        b = 5
