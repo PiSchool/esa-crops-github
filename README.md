@@ -11,6 +11,7 @@ Current extensions include:
 * Tiling the image without the requirement of having all the input images of the same size
 * Include U-Net model topology
 * Include a proposed implementation for HSN model and W-Net model
+* Include Hugin configuration files for both training and prediction phases for U-Net, HSN and W-Net
 
 
 This is a proof of concept. The above mentioned extensions are going to be included in the new Hugin release.
