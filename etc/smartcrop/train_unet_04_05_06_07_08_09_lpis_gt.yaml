@@ -1,4 +1,4 @@
-model_name: unet_smartcrop_5_nodata # This is the name for the model
+model_name: unet_smartcrop_corine_gt_2 # This is the name for the model
 data_source: !!python/object/apply:hugin.io.FileSystemLoader
   kwds:
     data_pattern: '(?P<region>T[0-9A-Z]+)_(?P<timestamp>[A-Z0-9]+)_(?P<type>[A-Z0-9_a-z]+)_(?P<res>[0-9a-z]+)_(?P<crs>[0-9]+)..*$'
@@ -6,7 +6,7 @@ data_source: !!python/object/apply:hugin.io.FileSystemLoader
     type_format: '{type}-{res}-{crs}'
     input_source: ../data/sentinel2_bands_only_olanda_2018/
     validation_percent: 0.2
-dataset_cache: ../etc/samples/sample_olanda_04_05_06_07_08_09_nodata.yaml
+dataset_cache: /home/tardis/test_smartcrop_hugin/etc/samples/sample_olanda_04_05_06_07_08_09.yaml
 window_size: [ 256, 256 ]
 stride_size: 128
 random_seed: 42
@@ -17,13 +17,16 @@ mapping:
       - [ "B04-10m-4326", 1 ]
       - [ "B08-10m-4326", 1]
   target:
-      - [ "GTNODATA-10m-4326", 1 ]
+      - [ "GTLPISNODATA-10m-4326", 1 ]
 model_type: keras
 model:
-  model_builder: hugin.models.unet.unetv15:unet_v15
+  model_builder: hugin.models.unet:build_unet
+  options:
+    n_channels: 4
+    nr_classes: 25
   batch_size: 5
   prefetch_queue_size: 10 # Default 10
-  model_path: "../data/smartcrop-models/{model_name}/{hostname}-{user}.hdf5"
+  model_path: "../data/smartcrop-models/models/{model_name}/{hostname}-{user}.hdf5"
   loss: categorical_crossentropy
   load_only_weights: False
   log: "../data/smartcrop-models/models/{model_name}/logging-{model_name}-{hostname}.csv"
@@ -35,7 +38,7 @@ model:
     epsilon: !!float 1e-4
     mode: min
   checkpoint:
-    path: "../data/smartcrop-models/_checkpoints/%(model_name)s/%(hostname)s-%(user)s-{epoch:02d}.hdf5"
+    path: "../data/smartcrop-models/models/_checkpoints/%(model_name)s/%(hostname)s-%(user)s-{epoch:02d}.hdf5"
     options: # This is optional
        save_best_only: False
   early_stopping:
@@ -57,7 +60,7 @@ model:
   jaccard_coef: False
   format_converter: !!python/object/apply:hugin.io.CategoricalConverter
     kwds:
-      num_classes: 8
+      num_classes: 25
   z_scaler:
     B02-10m-4326:
       mean: 327.22765374622156
