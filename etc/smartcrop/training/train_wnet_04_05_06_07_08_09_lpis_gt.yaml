@@ -1,4 +1,4 @@
-model_name: unet_smartcrop_corine_gt_2 # This is the name for the model
+model_name: wnet_smartcrop_lpis_gt_1 # This is the name for the model
 data_source: !!python/object/apply:hugin.io.FileSystemLoader
   kwds:
     data_pattern: '(?P<region>T[0-9A-Z]+)_(?P<timestamp>[A-Z0-9]+)_(?P<type>[A-Z0-9_a-z]+)_(?P<res>[0-9a-z]+)_(?P<crs>[0-9]+)..*$'
@@ -20,7 +20,7 @@ mapping:
       - [ "GTLPISNODATA-10m-4326", 1 ]
 model_type: keras
 model:
-  model_builder: hugin.models.unet:build_unet
+  model_builder: hugin.models.wnet:build_wnet
   options:
     n_channels: 4
     nr_classes: 25
