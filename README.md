@@ -16,7 +16,7 @@ Current extensions include:
 
 This is a proof of concept. The above mentioned extensions are going to be included in the new Hugin release. Please visit the [Wiki page](https://github.com/PiSchool/esa-crops-github/wiki) for a detailed information about the content of this repository.
 
-Documentation for Hugin is available at https://hugin-eo.readthedocs.io/
+Additional documentation for Hugin is available at https://hugin-eo.readthedocs.io/
 
 
 
