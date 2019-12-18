@@ -4,9 +4,9 @@ data_source: !!python/object/apply:hugin.io.FileSystemLoader
     data_pattern: '(?P<region>T[0-9A-Z]+)_(?P<timestamp>[A-Z0-9]+)_(?P<type>[A-Z0-9_a-z]+)_(?P<res>[0-9a-z]+)_(?P<crs>[0-9]+)..*$'
     id_format: '{region}-{timestamp}'
     type_format: '{type}-{res}-{crs}'
-    input_source: ../data/sentinel2_bands_only_olanda_2018/
+    input_source: ../data/training_data/
     validation_percent: 0.2
-dataset_cache: /home/tardis/test_smartcrop_hugin/etc/samples/sample_olanda_04_05_06_07_08_09.yaml
+dataset_cache:../etc/samples/sample_1.yaml
 window_size: [ 256, 256 ]
 stride_size: 128
 random_seed: 42
@@ -26,10 +26,10 @@ model:
     nr_classes: 25
   batch_size: 5
   prefetch_queue_size: 10 # Default 10
-  model_path: "../data/smartcrop-models/models/{model_name}/{hostname}-{user}.hdf5"
+  model_path: "../data/models/{model_name}/{hostname}-{user}.hdf5"
   loss: categorical_crossentropy
   load_only_weights: False
-  log: "../data/smartcrop-models/models/{model_name}/logging-{model_name}-{hostname}.csv"
+  log: "../data/models/{model_name}/logging-{model_name}-{hostname}.csv"
   adaptive_lr:
     monitor: val_loss
     factor: !!float 0.1
@@ -38,7 +38,7 @@ model:
     epsilon: !!float 1e-4
     mode: min
   checkpoint:
-    path: "../data/smartcrop-models/models/_checkpoints/%(model_name)s/%(hostname)s-%(user)s-{epoch:02d}.hdf5"
+    path: "../data/models/_checkpoints/%(model_name)s/%(hostname)s-%(user)s-{epoch:02d}.hdf5"
     options: # This is optional
        save_best_only: False
   early_stopping:
