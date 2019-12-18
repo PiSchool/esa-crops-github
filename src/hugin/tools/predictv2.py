@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 __license__ = \
     """Copyright 2019 West University of Timisoara
-    
+
        Licensed under the Apache License, Version 2.0 (the "License");
        you may not use this file except in compliance with the License.
        You may obtain a copy of the License at
-    
+
            http://www.apache.org/licenses/LICENSE-2.0
-    
+
        Unless required by applicable law or agreed to in writing, software
        distributed under the License is distributed on an "AS IS" BASIS,
        WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,10 +31,10 @@ from shapely.geometry import Polygon
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, jaccard_similarity_score, \
     zero_one_loss, hamming_loss, average_precision_score, cohen_kappa_score, confusion_matrix
 
-from ..io import DatasetLoader, DataGenerator
-from ..io.loader import adapt_shape_and_stride
-from ..tools.predict import get_probabilities_from_tiles, categorical_prediction, to_polygons
-from ..tools.utils import import_model_builder, np_mean_iou, overall_accuracy
+from hugin.io.loader import DatasetLoader, DataGenerator
+from hugin.io.loader import adapt_shape_and_stride
+from hugin.tools.predict import get_probabilities_from_tiles, categorical_prediction, to_polygons
+from hugin.tools.utils import import_model_builder, np_mean_iou, overall_accuracy
 
 log = getLogger(__name__)
 
@@ -69,6 +69,7 @@ def run_final_postprocessings(postprocessings, final_data, probability_data):
         final_data, probability_data = proc(final_data, probability_data)
     return final_data, probability_data
 
+
 def predict_handler(config, args):
     ensemble_config_file = args.ensemble_config
     ensemble_config = yaml.load(ensemble_config_file)
@@ -88,10 +89,6 @@ def predict_handler(config, args):
     log.info("Using datasource: %s", data_source)
     log.info("Atempting to classify data in %s", data_source.input_source)
 
-    dataset_loader, _ = data_source.get_dataset_loader()
-
-    log.info("classifying %d datasets", len(dataset_loader))
-
     if output_dir is not None:
         if not os.path.exists(output_dir):
             log.info("Creating output directory: %s", output_dir)
@@ -101,6 +98,9 @@ def predict_handler(config, args):
     h5 = h5py.File(output_prediction_h5, 'w')
 
     for model_name, model_config in models_config.items():
+        dataset_loader, _ = data_source.get_dataset_loader()
+        log.info("classifying %d datasets", len(dataset_loader))
+
         model_type = model_config.get("type", "keras")
         model_match_id_pattern = model_config.get('match_id', '.*')
         model_match_id = re.compile(model_match_id_pattern)
@@ -111,6 +111,7 @@ def predict_handler(config, args):
         batch_size = model_config["batch_size"]
         tile_merge_strategy = model_config.get("tile_merge_strategy", "average")
         mapping = model_config["mapping"]
+        z_scaler = model_config.get('z_scaler', None)
         ensemble_options = ensemble_config["ensemble"]
         ensemble_method = ensemble_options.get("method", "average")
         ensemble_handlers = {
@@ -170,16 +171,16 @@ def predict_handler(config, args):
                                            swap_axes=swap_axes,
                                            loop=False,
                                            default_window_size=window_size,
-                                           default_stride_size=stride_size)
+                                           default_stride_size=stride_size, z_scaler=z_scaler)
 
-            if len(output_mapping) == 1:
-                rio_raster = scene_data[output_mapping[0][0]]
-                output_window_shape, output_stride_size = adapt_shape_and_stride(rio_raster,
-                                                                                 data_generator.primary_scene,
-                                                                                 window_size, stride_size)
-            else:
-                output_window_shape = model_config.get('output_window_size', model_config.get('window_size'))
-                output_stride_size = model_config.get('output_stride_size', model_config.get('stride_size'))
+            ##    pass
+            # rio_raster = scene_data[output_mapping[0][0]]
+            # output_window_shape, output_stride_size = adapt_shape_and_stride(rio_raster,
+            #                                                                 data_generator.primary_scene,
+            #                                                                window_size, stride_size)
+            # else:
+            output_window_shape = model_config.get('output_window_size', model_config.get('window_size'))
+            output_stride_size = model_config.get('output_stride_size', model_config.get('stride_size'))
 
             output_shape = ensemble_config.get('output_shape', None)
             if output_shape:
@@ -223,6 +224,12 @@ def predict_handler(config, args):
     global_conf_matrix = 0
     global_score_overall_accuracy = 0
 
+    import csv
+    pred_file = open(os.path.join(output_dir, "results_" + model_name), "w")
+    pred_writer = csv.writer(pred_file, delimiter=';')
+    pred_writer.writerow(['Imageid', 'F1', 'Acc', 'Prec', 'Recall', 'Jaccard similarity'])
+
+    import json
     dataset_loader.reset()
     for scene in dataset_loader:
         scene_id, scene_data = scene
@@ -254,7 +261,8 @@ def predict_handler(config, args):
             if crs is None:
                 io.imsave(destination_file, reconstructed.astype(rasterio.uint8))
             else:
-                _source_profile.update(dtype=reconstructed.dtype, count=num_out_channels, compress='lzw', nodata=0)
+                _source_profile.update(dtype=reconstructed.dtype, count=num_out_channels, compress='lzw', nodata=0,
+                                       driver='GTiff')
 
                 with rasterio.open(destination_file, 'w', **_source_profile) as dst:
                     for idx in range(0, num_out_channels):
@@ -303,10 +311,11 @@ def predict_handler(config, args):
             score_recall = recall_score(bin_gti, flat_reconstructed, **recall_score_params)
             # score_roc_auc = roc_auc_score(bin_gti, flat_reconstructed)
             score_jaccard_similarity = jaccard_similarity_score(bin_gti, flat_reconstructed)
-            score_zero_one = zero_one_loss(bin_gti, flat_reconstructed)
-
-            hamming_loss_params = get_metric_option("hamming_loss", metric_options, metric_usage)
-            score_hamming = hamming_loss(bin_gti, flat_reconstructed, **hamming_loss_params)
+            # score_zero_one = zero_one_loss(bin_gti, flat_reconstructed)
+            score_zero_one = 0
+            #  hamming_loss_params = get_metric_option("hamming_loss", metric_options, metric_usage)
+            # score_hamming = hamming_loss(bin_gti, flat_reconstructed, **hamming_loss_params)
+            score_hamming = 0
 
             score_average = 0
             if params.get("type", "binary") == "binary":
@@ -314,9 +323,9 @@ def predict_handler(config, args):
                                                                    metric_usage)
                 score_average = average_precision_score(bin_gti, flat_reconstructed, **average_precision_score_params)
 
-            cohen_kappa_score_params = get_metric_option("cohen_kappa_score", metric_options, metric_usage)
-            score_kappa = cohen_kappa_score(bin_gti, flat_reconstructed, **cohen_kappa_score_params)
-
+                # cohen_kappa_score_params = get_metric_option("cohen_kappa_score", metric_options, metric_usage)
+                # score_kappa = cohen_kappa_score(bin_gti, flat_reconstructed, **cohen_kappa_score_params)
+            score_kappa = 0
             mean_iou_params = get_metric_option("np_mean_iou", metric_options, metric_usage)
 
             if params.get("type", "binary") == "binary":
@@ -324,10 +333,11 @@ def predict_handler(config, args):
                 score_iou = 0
                 score_mean_iou = 0
             else:
-                conf_matrix, score_iou, score_mean_iou = np_mean_iou(bin_gti, flat_reconstructed, **mean_iou_params)
-
-            score_overall_accuracy = overall_accuracy(conf_matrix)
-
+                # conf_matrix, score_iou, score_mean_iou = np_mean_iou(bin_gti, flat_reconstructed, **mean_iou_params)
+                score_iou = 0
+                score_mean_iou = 0
+            # score_overall_accuracy = overall_accuracy(conf_matrix)
+            score_overall_accuracy = 0
             global_score_f1 += score_f1
             global_score_accuracy += score_accuracy
             global_score_precision += score_precision
@@ -350,6 +360,9 @@ def predict_handler(config, args):
                 score_recall, score_jaccard_similarity,
                 score_zero_one, score_hamming, score_average, score_kappa, score_iou, score_mean_iou,
                 score_overall_accuracy))
+            pred_writer.writerow([scene_id, json.dumps([x.item() for x in score_f1]), score_accuracy,
+                                  json.dumps([x.item() for x in score_precision]),
+                                  json.dumps([x.item() for x in score_recall]), score_jaccard_similarity])
 
         if output_text:
             height, width, _ = result.shape
@@ -414,4 +427,9 @@ def predict_handler(config, args):
         global_score_zero_one, global_score_hamming, global_score_average, global_score_kappa, global_score_iou,
         global_score_mean_iou, global_score_overall_accuracy))
 
+    pred_writer.writerow(['Total', json.dumps([x.item() for x in global_score_f1]), global_score_accuracy,
+                          json.dumps([x.item() for x in global_score_precision]),
+                          json.dumps([x.item() for x in global_score_recall]), global_score_jaccard_similarity])
+
+    pred_file.close()
     log.info("Finished")
