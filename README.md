@@ -12,11 +12,14 @@ Current extensions include:
 * Include U-Net model topology
 * Include a proposed implementation for HSN model and W-Net model
 * Include Hugin configuration files for both training and prediction phases for U-Net, HSN and W-Net
+* Add prediction metric computation for multi-class semantic segmentation
 
 
-This is a proof of concept. The above mentioned extensions are going to be included in the new Hugin release.
 
-Documentation for Hugin is available at https://hugin-eo.readthedocs.io/
+This is a proof of concept. The above mentioned extensions are going to be included in the new Hugin release. Please visit the [Wiki page](https://github.com/PiSchool/esa-crops-github/wiki) for a detailed information about the content of this repository.
+
+Additional documentation for Hugin is available at https://hugin-eo.readthedocs.io/
+
 
 
 ## Acknowledgments
