@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from keras import Model
+from keras.layers import Conv2D
+
 __license__ = \
     """Copyright 2019 West University of Timisoara
     
@@ -152,6 +155,7 @@ def train_keras(model_name,
     train_epochs = model_config["train_epochs"]
     prefetch_queue_size = model_config.get("prefetch_queue_size", 10)
     input_channels = len(mapping["inputs"])
+    include_last_classfication =model_config.get("include_classfication_layer",True)
 
     z_scaler = model_config.get('z_scaler',None)
 
@@ -284,6 +288,15 @@ def train_keras(model_name,
                 model = load_model(existing_model_location, custom_objects=custom_objects)
         else:
             model = load_model(existing_model_location, custom_objects=custom_objects)
+            nr_classes = model_builder_option.get('nr_classes', None)
+
+            if (not include_last_classfication) and nr_classes:
+                model.layers.pop()
+                l =  Conv2D(25, (1, 1), activation='softmax',name="conv_final")(model.layers[-1].output)
+                layers = [ll for ll in model.layers]
+                layers.append(l)
+                m = Model (input=layers[0].input, output=layers[-1])
+                model = m
         log.info("Model loaded!")
     else:
         log.info("Building model")
