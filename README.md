@@ -23,6 +23,7 @@ Additional documentation for Hugin is available at https://hugin-eo.readthedocs.
 
 
 ## Acknowledgments
+This project was carried out under the supervision of the following stakeholders ESA, E-Geos, UrbyetOrbit, MEEO (Italy) and SISTEMA (Austria) .
 
 Hugin project development is supported by the European Space Agency through the ML4EO project.
 
